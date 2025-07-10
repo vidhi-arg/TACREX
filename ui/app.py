@@ -1,3 +1,4 @@
+from backend.route_engine import get_route
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
@@ -21,6 +22,16 @@ m = folium.Map(location=[18.525, 73.858], zoom_start=14)
 # Mark start & end
 try:
     start_coords = [float(i) for i in start.split(",")]
+    # Get live route
+route = get_route(start_coords[::-1], end_coords[::-1])  # ORS uses lon, lat
+
+if route:
+    coords = route["features"][0]["geometry"]["coordinates"]
+    coords_latlon = [[c[1], c[0]] for c in coords]  # Convert to lat,lon
+    folium.PolyLine(locations=coords_latlon, color="blue", weight=5).add_to(m)
+else:
+    st.error("Could not get route from ORS.")
+
     end_coords = [float(i) for i in end.split(",")]
     folium.Marker(start_coords, tooltip="Start", icon=folium.Icon(color='green')).add_to(m)
     folium.Marker(end_coords, tooltip="End", icon=folium.Icon(color='red')).add_to(m)
