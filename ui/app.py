@@ -16,10 +16,10 @@ start = st.text_input("Start coordinates (lat,lon)", "18.5204,73.8567")
 end = st.text_input("Destination coordinates (lat,lon)", "18.5300,73.8600")
 
 # Dummy threat zones
-threat_zones = [
-    {"lat": 18.524, "lon": 73.857, "radius": 300, "description": "Shelling Zone"},
-    {"lat": 18.526, "lon": 73.859, "radius": 200, "description": "Sniper Alert"},
-]
+threat_zones = 
+from backend.threat_ingestor import get_all_threats
+threat_zones = get_all_threats()
+
 
 # Create map
 m = folium.Map(location=[18.525, 73.858], zoom_start=14)
