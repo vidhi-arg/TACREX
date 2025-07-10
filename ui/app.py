@@ -52,6 +52,17 @@ try:
 
 except Exception as e:
     st.warning(f"Invalid input or routing error: {e}")
+    
+# Test marker from ACLED near Gaza (hardcoded)
+folium.Circle(
+    radius=300,
+    location=[31.5019, 34.4666],
+    color="red",
+    fill=True,
+    fill_color="crimson",
+    fill_opacity=0.4,
+    tooltip="Explosion: Strike hit residential building in Khan Yunis"
+).add_to(m)
 
 # Draw threat zones
 for threat in threat_zones:
