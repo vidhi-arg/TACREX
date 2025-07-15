@@ -23,18 +23,24 @@ end_place = st.text_input("Destination location", "Rafah, Gaza")
 # Function to geocode or parse coordinates
 def resolve_location(loc_string):
     try:
-        if "," in loc_string:
-            lat, lon = [float(x.strip()) for x in loc_string.split(",")]
+        # If string matches "lat, lon" format, treat as coordinates
+        parts = [x.strip() for x in loc_string.split(",")]
+        if len(parts) == 2 and all(p.replace('.', '', 1).replace('-', '', 1).isdigit() for p in parts):
+            lat, lon = [float(x) for x in parts]
             return [lat, lon]
+
+        # Otherwise, use geopy to resolve place name
         location = geolocator.geocode(loc_string, timeout=10)
         if location:
             return [location.latitude, location.longitude]
         else:
             raise ValueError(f"Location '{loc_string}' not found.")
+
     except GeocoderTimedOut:
         raise ValueError("Geocoding service timed out. Try again.")
     except Exception as e:
         raise ValueError(f"Error resolving location '{loc_string}': {e}")
+
 
 # Load threat zones from ACLED
 threat_zones = get_all_threats()
