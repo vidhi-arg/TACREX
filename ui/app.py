@@ -23,7 +23,7 @@ st.write("Loaded threat zones:", len(threat_zones))  # Debug info
 # Create map (centered over Gaza for ACLED testing)
 m = folium.Map(location=[31.51, 34.46], zoom_start=12)
 
-# Add test marker from ACLED to confirm visibility
+# Add hardcoded test threat circle for debug purposes
 folium.Circle(
     radius=300,
     location=[31.5019, 34.4666],
@@ -46,12 +46,12 @@ for threat in threat_zones:
         tooltip=threat["description"]
     ).add_to(m)
 
-# Route drawing block
+# Route drawing and risk analysis
 try:
     start_coords = [float(i) for i in start.split(",")]
     end_coords = [float(i) for i in end.split(",")]
 
-    # Add start/end markers
+    # Add markers to map
     folium.Marker(start_coords, tooltip="Start", icon=folium.Icon(color='green')).add_to(m)
     folium.Marker(end_coords, tooltip="End", icon=folium.Icon(color='red')).add_to(m)
 
@@ -62,11 +62,24 @@ try:
         coords = route["features"][0]["geometry"]["coordinates"]
         coords_latlon = [[c[1], c[0]] for c in coords]
 
-        # Risk evaluation
-        risk = evaluate_route_risk(coords_latlon, threat_zones)
+        # Evaluate route risk
+        risk, hits = evaluate_route_risk(coords_latlon, threat_zones)
         st.subheader(f"Route Risk Level: {risk}")
 
-        # Route coloring by risk
+        # Tactical threat debrief
+        if hits:
+            with st.expander("⚠ Intersected Threat Zones"):
+                for i, t in enumerate(hits, 1):
+                    st.write(f"**{i}.** {t['description']} at ({t['lat']:.4f}, {t['lon']:.4f})")
+
+        # Tactical advice based on risk
+        if risk == "High Risk":
+            st.warning("This route intersects multiple active threat zones.")
+            st.info("Consider adjusting your coordinates or waiting for safer conditions.")
+        elif risk == "Borderline":
+            st.warning("This route brushes near known threats. Stay cautious.")
+
+        # Add route to map
         color = "green" if "Safe" in risk else "orange" if "Borderline" in risk else "red"
         folium.PolyLine(locations=coords_latlon, color=color, weight=5).add_to(m)
     else:
@@ -75,8 +88,15 @@ try:
 except Exception as e:
     st.warning(f"Routing or input error: {e}")
 
-# Show the map
+# Link to live map
+st.markdown(
+    "[View live conflict map](https://liveuamap.com/)",
+    unsafe_allow_html=True
+)
+
+# Show final map
 st_data = st_folium(m, width=1000, height=600)
+
 
 
 
