@@ -8,50 +8,61 @@ from streamlit_folium import st_folium
 from backend.route_engine import get_route
 from backend.risk_evaluator import evaluate_route_risk
 from backend.threat_ingestor import get_all_threats
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 
+# Set up page and geocoder
 st.set_page_config(layout="wide")
 st.title("TACREX: Tactical Escape Route Planner")
+geolocator = Nominatim(user_agent="tacrex-geocoder")
 
-# Input fields
-start = st.text_input("Start coordinates (lat,lon)", "31.5000,34.4500")
-end = st.text_input("Destination coordinates (lat,lon)", "31.5200,34.4700")
+# Input fields (city or lat,lon)
+start_place = st.text_input("Start location (city, area, or coordinates)", "Khan Yunis, Gaza")
+end_place = st.text_input("Destination location", "Rafah, Gaza")
+
+# Function to geocode or parse coordinates
+def resolve_location(loc_string):
+    try:
+        if "," in loc_string:
+            lat, lon = [float(x.strip()) for x in loc_string.split(",")]
+            return [lat, lon]
+        location = geolocator.geocode(loc_string, timeout=10)
+        if location:
+            return [location.latitude, location.longitude]
+        else:
+            raise ValueError(f"Location '{loc_string}' not found.")
+    except GeocoderTimedOut:
+        raise ValueError("Geocoding service timed out. Try again.")
+    except Exception as e:
+        raise ValueError(f"Error resolving location '{loc_string}': {e}")
 
 # Load threat zones from ACLED
 threat_zones = get_all_threats()
 st.write("Loaded threat zones:", len(threat_zones))  # Debug info
 
-# Create map (centered over Gaza for ACLED testing)
-m = folium.Map(location=[31.51, 34.46], zoom_start=12)
-
-# Add hardcoded test threat circle for debug purposes
-folium.Circle(
-    radius=300,
-    location=[31.5019, 34.4666],
-    color="red",
-    fill=True,
-    fill_color="crimson",
-    fill_opacity=0.4,
-    tooltip="Explosion: Strike hit residential building in Khan Yunis"
-).add_to(m)
-
-# Draw all ACLED threat zones
-for threat in threat_zones:
-    folium.Circle(
-        radius=threat["radius"],
-        location=[threat["lat"], threat["lon"]],
-        color="red",
-        fill=True,
-        fill_color="crimson",
-        fill_opacity=0.4,
-        tooltip=threat["description"]
-    ).add_to(m)
-
-# Route drawing and risk analysis
 try:
-    start_coords = [float(i) for i in start.split(",")]
-    end_coords = [float(i) for i in end.split(",")]
+    # Convert locations to coordinates
+    start_coords = resolve_location(start_place)
+    end_coords = resolve_location(end_place)
 
-    # Add markers to map
+    # Center map between start and end
+    map_center = [(start_coords[0] + end_coords[0]) / 2, (start_coords[1] + end_coords[1]) / 2]
+    m = folium.Map(location=map_center, zoom_start=12)
+
+
+    # Draw real ACLED threats
+    for threat in threat_zones:
+        folium.Circle(
+            radius=threat["radius"],
+            location=[threat["lat"], threat["lon"]],
+            color="red",
+            fill=True,
+            fill_color="crimson",
+            fill_opacity=0.4,
+            tooltip=threat["description"]
+        ).add_to(m)
+
+    # Place markers for user input
     folium.Marker(start_coords, tooltip="Start", icon=folium.Icon(color='green')).add_to(m)
     folium.Marker(end_coords, tooltip="End", icon=folium.Icon(color='red')).add_to(m)
 
@@ -62,39 +73,37 @@ try:
         coords = route["features"][0]["geometry"]["coordinates"]
         coords_latlon = [[c[1], c[0]] for c in coords]
 
-        # Evaluate route risk
+        # Evaluate threat risk
         risk, hits = evaluate_route_risk(coords_latlon, threat_zones)
         st.subheader(f"Route Risk Level: {risk}")
 
-        # Tactical threat debrief
         if hits:
             with st.expander("⚠ Intersected Threat Zones"):
                 for i, t in enumerate(hits, 1):
                     st.write(f"**{i}.** {t['description']} at ({t['lat']:.4f}, {t['lon']:.4f})")
 
-        # Tactical advice based on risk
         if risk == "High Risk":
             st.warning("This route intersects multiple active threat zones.")
             st.info("Consider adjusting your coordinates or waiting for safer conditions.")
         elif risk == "Borderline":
             st.warning("This route brushes near known threats. Stay cautious.")
 
-        # Add route to map
+        # Draw route
         color = "green" if "Safe" in risk else "orange" if "Borderline" in risk else "red"
         folium.PolyLine(locations=coords_latlon, color=color, weight=5).add_to(m)
     else:
         st.error("Could not fetch route from OpenRouteService.")
 
 except Exception as e:
-    st.warning(f"Routing or input error: {e}")
+    st.warning(f"Routing or geocoding error: {e}")
 
-# Link to live map
+# Link to external OSINT
 st.markdown(
-    "[View live conflict map](https://liveuamap.com/)",
+    "[View live Gaza conflict map](https://israelpalestine.liveuamap.com/)",
     unsafe_allow_html=True
 )
 
-# Show final map
+# Render map
 st_data = st_folium(m, width=1000, height=600)
 
 
