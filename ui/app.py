@@ -40,8 +40,9 @@ def resolve_location(loc_string):
 threat_zones = get_all_threats()
 st.write("Loaded threat zones:", len(threat_zones))  # Debug info
 
+# Routing logic
 try:
-    # Convert locations to coordinates
+    # Convert user input to coordinates
     start_coords = resolve_location(start_place)
     end_coords = resolve_location(end_place)
 
@@ -49,8 +50,7 @@ try:
     map_center = [(start_coords[0] + end_coords[0]) / 2, (start_coords[1] + end_coords[1]) / 2]
     m = folium.Map(location=map_center, zoom_start=12)
 
-
-    # Draw real ACLED threats
+    # Draw all ACLED threat zones
     for threat in threat_zones:
         folium.Circle(
             radius=threat["radius"],
@@ -62,23 +62,23 @@ try:
             tooltip=threat["description"]
         ).add_to(m)
 
-    # Place markers for user input
+    # Add markers for start and end
     folium.Marker(start_coords, tooltip="Start", icon=folium.Icon(color='green')).add_to(m)
     folium.Marker(end_coords, tooltip="End", icon=folium.Icon(color='red')).add_to(m)
 
-    # Get route from OpenRouteService (lon, lat)
+    # Get route from OpenRouteService (requires [lon, lat])
     route = get_route(start_coords[::-1], end_coords[::-1])
 
     if route:
         coords = route["features"][0]["geometry"]["coordinates"]
         coords_latlon = [[c[1], c[0]] for c in coords]
 
-        # Evaluate threat risk
+        # Evaluate risk level
         risk, hits = evaluate_route_risk(coords_latlon, threat_zones)
         st.subheader(f"Route Risk Level: {risk}")
 
         if hits:
-            with st.expander("⚠ Intersected Threat Zones"):
+            with st.expander("Intersected Threat Zones"):
                 for i, t in enumerate(hits, 1):
                     st.write(f"**{i}.** {t['description']} at ({t['lat']:.4f}, {t['lon']:.4f})")
 
@@ -88,23 +88,29 @@ try:
         elif risk == "Borderline":
             st.warning("This route brushes near known threats. Stay cautious.")
 
-        # Draw route
-        color = "green" if "Safe" in risk else "orange" if "Borderline" in risk else "red"
+        # Draw route on map
+        color = "green" if risk == "Safe" else "orange" if risk == "Borderline" else "red"
         folium.PolyLine(locations=coords_latlon, color=color, weight=5).add_to(m)
     else:
         st.error("Could not fetch route from OpenRouteService.")
 
 except Exception as e:
-    st.warning(f"Routing or geocoding error: {e}")
+    st.warning("Routing or geocoding error occurred.")
+    st.text(f"{e}")
 
-# Link to external OSINT
+# External conflict map
 st.markdown(
     "[View live Gaza conflict map](https://israelpalestine.liveuamap.com/)",
     unsafe_allow_html=True
 )
 
-# Render map
+# Fallback map if previous block failed
+if 'm' not in locals():
+    m = folium.Map(location=[20, 0], zoom_start=2)
+
+# Display map
 st_data = st_folium(m, width=1000, height=600)
+
 
 
 
