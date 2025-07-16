@@ -1,17 +1,18 @@
-from geopy.distance import geodesic
+from shapely.geometry import LineString, Polygon
 
-def evaluate_route_risk(route_coords, threat_zones):
-    hits = []
-    for point in route_coords:
-        for threat in threat_zones:
-            dist = geodesic(point, [threat["lat"], threat["lon"]]).meters
-            if dist < threat["radius"]:
-                hits.append(threat)
+def evaluate_risk(route, threat_zones):
+    route_line = LineString(route)
+    for zone_coords in threat_zones:
+        zone_poly = Polygon(zone_coords)
+        if route_line.intersects(zone_poly):
+            return "High Risk"
+    return "Safe"
 
-    if len(hits) == 0:
-        return "Safe", []
-    elif len(hits) <= 2:
-        return "Borderline", hits
-    else:
-        return "High Risk", hits
+def evaluate_all_routes(routes, threat_zones):
+    results = []
+    for route in routes:
+        risk = evaluate_risk(route, threat_zones)
+        results.append({"route": route, "risk": risk})
+    return results
+
 
