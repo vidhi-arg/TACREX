@@ -1,2 +1,6 @@
-
+streamlit
+folium
+streamlit-folium
+openrouteservice
+geopy
 
